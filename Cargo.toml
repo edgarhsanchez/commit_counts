@@ -6,3 +6,16 @@ edition = "2021"
 [dependencies]
 git2 = "0.19.0"
 rayon = "1.10.0"
+
+
+[target.x86_64-unknown-linux-gnu]
+pre-build = [
+  "dpkg --add-architecture $CROSS_DEB_ARCH",
+  "apt-get update && apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH"
+]
+
+[target.x86_64-apple-darwin]
+pre-build = [
+  "dpkg --add-architecture $CROSS_DEB_ARCH",
+  "apt-get update && apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH"
+]
