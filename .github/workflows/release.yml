@@ -32,10 +32,14 @@ jobs:
       - name: Build the binary
         run: cargo build --release --bin $REPO_NAME
 
-      # Read the contents of CHANGELOG.md
+      # Read the contents of CHANGELOG.md into an environment variable
       - name: Read CHANGELOG.md
         id: changelog
-        run: echo "CHANGELOG_CONTENT=$(cat CHANGELOG.md)" >> $GITHUB_ENV
+        run: |
+          CHANGELOG_CONTENT=$(cat CHANGELOG.md)
+          echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_ENV
+          echo "$CHANGELOG_CONTENT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       # Create GitHub Release with the CHANGELOG content as the release notes
       - name: Create GitHub Release
