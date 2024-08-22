@@ -6,19 +6,43 @@ permissions:
 on:
   push:
     tags:
-      - v[0-9]+.*
+      - v[0-9]+.*  # Trigger the action when a tag is pushed that matches this pattern
 
 jobs:
-  create-release:
+  build-and-release:
     runs-on: ubuntu-latest
+
     steps:
+      # Checkout the code from the repository
       - uses: actions/checkout@v4
-      - uses: taiki-e/create-gh-release-action@v1
+
+      # Set up the repository name as an environment variable
+      - name: Set repository name
+        run: echo "REPO_NAME=$(basename ${{ github.repository }})" >> $GITHUB_ENV
+
+      # Install Rust toolchain using rustup
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
         with:
-          # (Optional) Path to changelog.
-          changelog: CHANGELOG.md
-          # (Optional) Reject releases from commits not contained in branches
-          # that match the specified pattern (regular expression)
-          branch: main
-          # (Required) GitHub token for creating GitHub Releases.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          override: true
+
+      # Build the Rust project in release mode
+      - name: Build the binary
+        run: cargo build --release --bin $REPO_NAME
+
+      # Read the contents of CHANGELOG.md
+      - name: Read CHANGELOG.md
+        id: changelog
+        run: echo "CHANGELOG_CONTENT=$(cat CHANGELOG.md)" >> $GITHUB_ENV
+
+      # Create GitHub Release with the CHANGELOG content as the release notes
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/release/${{ env.REPO_NAME }}
+          body: ${{ env.CHANGELOG_CONTENT }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
