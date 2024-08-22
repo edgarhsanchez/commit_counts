@@ -36,12 +36,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install OpenSSL and other dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Set up OpenSSL for macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install openssl
+          echo "OPENSSL_DIR=$(brew --prefix openssl)" >> $GITHUB_ENV
+
       - name: Install cross-compilation tools
         uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
         if: startsWith(matrix.os, 'ubuntu')
-      - uses: taiki-e/upload-rust-binary-action@v1
+
+      - name: Build and upload binary
+        uses: taiki-e/upload-rust-binary-action@v1
         with:
           # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
           # Note that glob pattern is not supported yet.
@@ -50,3 +63,6 @@ jobs:
           target: ${{ matrix.target }}
           # (required) GitHub token for uploading assets to GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
+          PKG_CONFIG_PATH: ${{ env.OPENSSL_DIR }}/lib/pkgconfig
