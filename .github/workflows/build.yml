@@ -68,9 +68,9 @@ jobs:
         cargo install --git https://github.com/davidpdrsn/cargo-public-api-crates
     - name: Build rustdoc
       run: |
-        cargo rustdoc --all-features --manifest-path ${{ matrix.crate }}/Cargo.toml -- -Z unstable-options --output-format json
+        cargo rustdoc --all-features --manifest-path ./Cargo.toml -- -Z unstable-options --output-format json
     - name: cargo public-api-crates check
-      run: cargo public-api-crates --manifest-path ${{ matrix.crate }}/Cargo.toml --skip-build check
+      run: cargo public-api-crates --manifest-path ./Cargo.toml --skip-build check
 
   test-versions:
     needs: check
