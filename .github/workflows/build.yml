@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v1
     - name: Test compilation
       run: make check
@@ -34,7 +34,7 @@ jobs:
     name: Windows (nightly)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           profile: default
