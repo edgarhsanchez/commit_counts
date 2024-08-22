@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]  # Define the OS matrix
@@ -39,15 +39,18 @@ jobs:
       - name: Build the binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      # Archive the binary as an artifact
-      - name: Archive binary
+      # Archive the binary as an artifact based on OS
+      - name: Archive binary on Linux/Mac
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/${{ env.REPO_NAME }} artifacts/${{ env.REPO_NAME }}-${{ matrix.os }}
+
+      - name: Archive binary on Windows
         if: runner.os == 'Windows'
         run: |
           mkdir -p artifacts
           cp target/${{ matrix.target }}/release/${{ env.REPO_NAME }}.exe artifacts/${{ env.REPO_NAME }}-${{ matrix.os }}.exe
-        else:
-          mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/${{ env.REPO_NAME }} artifacts/${{ env.REPO_NAME }}-${{ matrix.os }}
 
       # Upload the artifact for use in later jobs
       - name: Upload Artifact
@@ -66,7 +69,10 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
         with:
-          name: ${{ env.REPO_NAME }}-${{ matrix.os }}
+          name: |
+            ${{ env.REPO_NAME }}-ubuntu-latest
+            ${{ env.REPO_NAME }}-macos-latest
+            ${{ env.REPO_NAME }}-windows-latest.exe
 
       # Read the contents of CHANGELOG.md
       - name: Read CHANGELOG.md
