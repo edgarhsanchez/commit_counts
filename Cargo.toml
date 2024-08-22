@@ -19,3 +19,9 @@ pre-build = [
   "dpkg --add-architecture $CROSS_DEB_ARCH",
   "apt-get update && apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH"
 ]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0"
+]
