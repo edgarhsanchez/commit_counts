@@ -1,52 +1,53 @@
-name: Release
-
-permissions:
-  contents: write
+name: Cross-Compile with Cross
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - v[0-9]+.*
+      - v[0-9]+.*  # Trigger on version tags
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  create-release:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/create-gh-release-action@v1
-        with:
-          # (optional) Path to changelog.
-          changelog: CHANGELOG.md
-          # (required) GitHub token for creating GitHub Releases.
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-  upload-assets:
-    needs: create-release
     strategy:
       matrix:
-        include:
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: aarch64-apple-darwin
-            os: macos-latest
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
-    runs-on: ${{ matrix.os }}
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - x86_64-pc-windows-gnu  # Use the GNU toolchain for Windows
+
     steps:
+      # Checkout the code from the repository
       - uses: actions/checkout@v4
-      - name: Install cross-compilation tools
-        uses: taiki-e/setup-cross-toolchain-action@v1
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      # Install `cross` using cargo
+      - name: Install cross
+        run: cargo install cross
+
+      # Build the project using cross for the specified target
+      - name: Build with cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      # Archive the binary as an artifact
+      - name: Archive binary
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/$(basename ${{ github.repository }})* artifacts/
+
+      # Upload the artifact for later use
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
         with:
-          target: ${{ matrix.target }}
-        if: startsWith(matrix.os, 'ubuntu')
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
-          # Note that glob pattern is not supported yet.
-          bin: ...
-          # (optional) Target triple, default is host triple.
-          target: ${{ matrix.target }}
-          # (required) GitHub token for uploading assets to GitHub Releases.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ github.repository }}-${{ matrix.target }}
+          path: artifacts/*
