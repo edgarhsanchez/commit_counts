@@ -1,27 +1,21 @@
 //! This program counts the number of commits by each user across all Git repositories in a directory.
-//! 
+//!
 //! It also prints the remote origins of each repository.
 //! Use it like this:
 //! ./commit_counter /path/to/directory
 
-
+use git2::Repository;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
-use git2::Repository;
-use rayon::prelude::*;
 use std::sync::Mutex;
-
 
 fn main() {
     // Check for a command-line argument, otherwise default to current directory
     let args: Vec<String> = env::args().collect();
-    let start_path = if args.len() > 1 {
-        &args[1]
-    } else {
-        "."
-    };
+    let start_path = if args.len() > 1 { &args[1] } else { "." };
 
     let git_dirs = find_git_dirs(start_path);
 
@@ -96,17 +90,20 @@ fn count_commits_by_user(repo: &Repository) -> Result<HashMap<String, i32>, git2
 
     let mut commits_by_user = HashMap::new();
 
-    revwalk.map(|commit| {
-        if let Ok(commit) = commit {
-            if let Ok(commit) = repo.find_commit(commit) {
-                let (first, last) = get_first_and_last(commit.author().name().unwrap_or("Unknown").to_string());
-                // Concatenate first and last name
-                let name = format!("{} {}", first, last);
-                let count = commits_by_user.entry(name).or_insert(0);
-                *count += 1;
+    revwalk
+        .map(|commit| {
+            if let Ok(commit) = commit {
+                if let Ok(commit) = repo.find_commit(commit) {
+                    let (first, last) =
+                        get_first_and_last(commit.author().name().unwrap_or("Unknown").to_string());
+                    // Concatenate first and last name
+                    let name = format!("{} {}", first, last);
+                    let count = commits_by_user.entry(name).or_insert(0);
+                    *count += 1;
+                }
             }
-        }
-    }).for_each(drop);
+        })
+        .for_each(drop);
 
     Ok(commits_by_user)
 }
@@ -133,8 +130,6 @@ fn get_first_and_last(author: String) -> (String, String) {
 
     (first.to_string(), last.to_string())
 }
-
-
 
 fn get_remote_origin_url(repo: &Repository) -> Option<String> {
     if let Ok(remote) = repo.find_remote("origin") {
