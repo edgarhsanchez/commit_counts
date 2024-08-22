@@ -99,7 +99,7 @@ fn count_commits_by_user(repo: &Repository) -> Result<HashMap<String, i32>, git2
             }
         }
         Some(()) // Provide a unit type to satisfy the type inference
-    }).count();
+    }).for_each(drop);
 
     Ok(commits_by_user)
 }
@@ -112,7 +112,7 @@ fn get_first_and_last(author: String) -> (String, String) {
     }
 
     let binding = author.to_ascii_lowercase();
-    let mut parts = binding.trim().split_whitespace();
+    let mut parts = binding.split_whitespace();
     let first = parts.next().unwrap_or_default().trim();
     let last = parts.last().unwrap_or_default().trim();
 
