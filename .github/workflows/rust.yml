@@ -20,3 +20,11 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+  
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Build and upload Rust binary to GitHub Releases
+      uses: taiki-e/upload-rust-binary-action@v1.22.0
+            
