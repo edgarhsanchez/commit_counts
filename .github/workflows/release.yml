@@ -37,13 +37,11 @@ jobs:
 
       - name: Create GitHub release
         id: release
-        uses: ncipollo/release-action@v1
+        uses: taiki-e/create-gh-release-action@v1
         with:
-          tag: ${{ env.ARTIFACT_VERSION }}
-          name: ${{ env.ARTIFACT_VERSION }}
-          allowUpdates: true
-          omitBody: true
-          omitPrereleaseDuringUpdate: true
+          # (optional) Path to changelog.
+          changelog: CHANGELOG.md
+          # (required) GitHub token for creating GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Save release upload URL to artifact
