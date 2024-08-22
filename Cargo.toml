@@ -7,6 +7,7 @@ readme = "README.md"
 repository = "https://github.com/edgarhsanchez/commit_counts.git"
 description = "A tool to count commits in a git repository"
 keywords = ["git", "commits", "count"]
+include = ["src/**/*", "Cargo.*", "LICENSE", "README.md", "CHANGELOG.md", "!**/tests/*"]
 
 [dependencies]
 git2 = "0.19.0"
@@ -30,5 +31,19 @@ allow = [
     "Apache-2.0"
 ]
 
+[[bin]]
+name = "commit_counts"
+
 [package.metadata.cargo-public-api-crates]
 allowed = ["git2", "rayon"]
+
+[profile.release]
+panic = 'abort'
+incremental = false
+overflow-checks = false
+lto = "fat"
+#codegen-units = 1
+build-override = { opt-level = 3 }
+
+[dev-dependencies]
+pretty_assertions = "1.0.0"
