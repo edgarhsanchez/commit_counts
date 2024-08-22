@@ -44,7 +44,7 @@ fn main() {
     });
 
     // Get the final commit counts and sort them
-    let mut total_commits_by_user = total_commits_by_user.lock().unwrap().clone();
+    let total_commits_by_user = total_commits_by_user.lock().unwrap().clone();
     let mut commit_counts: Vec<_> = total_commits_by_user.iter().collect();
     commit_counts.sort_by(|a, b| b.1.cmp(a.1));
 
@@ -84,9 +84,7 @@ fn find_git_dirs(start_path: &str) -> Vec<String> {
 
 fn count_commits_by_user(repo: &Repository) -> Result<HashMap<String, i32>, git2::Error> {
     let mut revwalk = repo.revwalk()?;
-    if let Err(e) = revwalk.push_head() {
-        return Err(e);
-    }
+    revwalk.push_head()?;
 
     let mut commits_by_user = HashMap::new();
 
