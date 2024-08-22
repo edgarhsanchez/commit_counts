@@ -9,116 +9,44 @@ on:
       - v[0-9]+.*
 
 jobs:
-  build-and-release:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest]  # Define the OS matrix
-        target:  # Define the target triple for each OS
-          - x86_64-unknown-linux-gnu
-          - x86_64-apple-darwin
-          - x86_64-pc-windows-msvc
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set repository name
-        run: echo "REPO_NAME=$(basename ${{ github.repository }})" >> $GITHUB_ENV
-
-      # Install dependencies on Linux
-      - name: Install dependencies on Linux
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
-
-      # Install dependencies on macOS
-      - name: Install dependencies on macOS
-        if: runner.os == 'macOS'
-        run: brew install openssl
-
-      # Install dependencies on Windows
-      - name: Install dependencies on Windows
-        if: runner.os == 'Windows'
-        run: |
-          vcpkg install openssl:x64-windows
-          echo "VCPKG_ROOT=$(vcpkg_root)" >> $GITHUB_ENV
-
-      # Set environment variables for OpenSSL
-      - name: Set OpenSSL environment variables
-        if: runner.os == 'macOS'
-        run: |
-          echo "OPENSSL_DIR=$(brew --prefix openssl)" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig" >> $GITHUB_ENV
-
-      - name: Set OpenSSL environment variables for Windows
-        if: runner.os == 'Windows'
-        run: |
-          echo "OPENSSL_DIR=${{ env.VCPKG_ROOT }}/installed/x64-windows" >> $GITHUB_ENV
-          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-
-      # Set up Rust toolchain using rustup
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
-
-      # Build the Rust project in release mode
-      - name: Build the binary
-        env:
-          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
-          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
-          OPENSSL_STATIC: ${{ env.OPENSSL_STATIC }}
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Archive binary on Linux/Mac
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/${{ env.REPO_NAME }} artifacts/${{ env.REPO_NAME }}-${{ matrix.os }}
-
-      - name: Archive binary on Windows
-        if: runner.os == 'Windows'
-        run: |
-          mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/${{ env.REPO_NAME }}.exe artifacts/${{ env.REPO_NAME }}-${{ matrix.os }}.exe
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ env.REPO_NAME }}-${{ matrix.os }}
-          path: artifacts/${{ env.REPO_NAME }}-${{ matrix.os }}*
-
   create-release:
     runs-on: ubuntu-latest
-    needs: build-and-release
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@v3
+      - uses: taiki-e/create-gh-release-action@v1
         with:
-          name: |
-            ${{ env.REPO_NAME }}-ubuntu-latest
-            ${{ env.REPO_NAME }}-macos-latest
-            ${{ env.REPO_NAME }}-windows-latest.exe
+          # (optional) Path to changelog.
+          changelog: CHANGELOG.md
+          # (required) GitHub token for creating GitHub Releases.
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read CHANGELOG.md
-        id: changelog
-        run: |
-          CHANGELOG_CONTENT=$(cat CHANGELOG.md)
-          echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_ENV
-          echo "$CHANGELOG_CONTENT" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+  upload-assets:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross-compilation tools
+        uses: taiki-e/setup-cross-toolchain-action@v1
         with:
-          files: |
-            ${{ env.REPO_NAME }}-ubuntu-latest
-            ${{ env.REPO_NAME }}-macos-latest
-            ${{ env.REPO_NAME }}-windows-latest.exe
-          body: ${{ env.CHANGELOG_CONTENT }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          target: ${{ matrix.target }}
+        if: startsWith(matrix.os, 'ubuntu')
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
+          # Note that glob pattern is not supported yet.
+          bin: ...
+          # (optional) Target triple, default is host triple.
+          target: ${{ matrix.target }}
+          # (required) GitHub token for uploading assets to GitHub Releases.
+          token: ${{ secrets.GITHUB_TOKEN }}
