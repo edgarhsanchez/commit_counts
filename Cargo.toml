@@ -1,7 +1,12 @@
 [package]
 name = "commit_counts"
-version = "0.1.0"
-edition = "2021"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/edgarhsanchez/commit_counts.git"
+description = "A tool to count commits in a git repository"
+keywords = ["git", "commits", "count"]
 
 [dependencies]
 git2 = "0.19.0"
@@ -24,3 +29,6 @@ allow = [
     "MIT",
     "Apache-2.0"
 ]
+
+[package.metadata.cargo-public-api-crates]
+allowed = ["commit_counts"]
