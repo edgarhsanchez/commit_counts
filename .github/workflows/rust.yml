@@ -27,4 +27,9 @@ jobs:
     steps:
     - name: Build and upload Rust binary to GitHub Releases
       uses: taiki-e/upload-rust-binary-action@v1.22.0
+      with:
+          # (optional) Path to changelog.
+          changelog: CHANGELOG.md
+          # (required) GitHub token for creating GitHub Releases.
+          token: ${{ secrets.GITHUB_TOKEN }}
             
