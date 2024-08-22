@@ -1,42 +1,59 @@
-name: Build
-on: [push]
+name: Cross-Compile with Cross
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v[0-9]+.*  # Trigger on version tags
+  pull_request:
+    branches:
+      - main
+
 jobs:
   build:
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        include:
-          # Linux config
-          - name: linux-amd64
-            runner: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            command: cargo
-          # Android config
-          - name: android-arm
-            runner: ubuntu-latest
-            target: aarch64-linux-android
-            command: cross
-          # MacOS config
-          - name: macos-amd64
-            runner: macos-latest
-            target: x86_64-apple-darwin
-            command: cargo
- 
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - x86_64-pc-windows-gnu  # Use the GNU toolchain for Windows
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
- 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
- 
-      # Only install cross if we need it
-      # Install via cargo-binstall which I found faster
-      - name: Install Cross
-        if: matrix.command == 'cross'
-        shell: bash
+      - uses: actions/checkout@v4
+
+      # Install dependencies
+      - name: Install dependencies
         run: |
-          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall --no-confirm cross
- 
-      - name: Build Binary
-        run: ${{ matrix.command }} build --verbose --locked --release --target ${{ matrix.target }}
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      # Install `cross` using cargo
+      - name: Install cross
+        run: cargo install cross
+
+      # Install necessary Rust targets
+      - name: Install Rust targets
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          rustup target add x86_64-apple-darwin
+          rustup target add x86_64-pc-windows-gnu
+
+      # Build the project using cross for the specified target
+      - name: Build with cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      # Archive the binary as an artifact
+      - name: Archive binary
+        run: |
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/$(basename ${{ github.repository }})* artifacts/
+
+      # Upload the artifact for later use
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.repository }}-${{ matrix.target }}
+          path: artifacts/*
