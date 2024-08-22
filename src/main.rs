@@ -6,6 +6,11 @@ use git2::Repository;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
+/// This program counts the number of commits by each user across all Git repositories in a directory.
+/// 
+/// It also prints the remote origins of each repository.
+/// Use it like this:
+/// ./commit_counter /path/to/directory
 fn main() {
     // Check for a command-line argument, otherwise default to current directory
     let args: Vec<String> = env::args().collect();
