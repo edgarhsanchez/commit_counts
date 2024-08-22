@@ -1,176 +1,53 @@
-name: CI
-
-env:
-  CARGO_TERM_COLOR: always
-  MSRV: '1.66'
+name: Rust
 
 on:
   push:
-    branches:
-    - main
-    tags:
-    - '*'
-  pull_request: {}
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: taiki-e/install-action@protoc
-    - uses: dtolnay/rust-toolchain@beta
-      with:
-        components: clippy, rustfmt
-    - uses: Swatinem/rust-cache@v2
-    - name: Check
-      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-    - name: rustfmt
-      run: cargo fmt --all --check
+  build-and-test:
 
-  check-docs:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
-    - name: cargo doc
-      env:
-        RUSTDOCFLAGS: "-D rustdoc::all -A rustdoc::private-doc-tests"
-      run: cargo doc --all-features --no-deps
 
-  cargo-hack:
-    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: taiki-e/install-action@protoc
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
-    - name: Install cargo-hack
-      run: |
-        curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
-    - name: cargo hack check
-      run: cargo hack check --each-feature --no-dev-deps --all
-
-
-  test-versions:
-    needs: check
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust: [stable, beta]
-    steps:
-    - uses: actions/checkout@v4
-    - uses: taiki-e/install-action@protoc
-    - uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
-    - uses: Swatinem/rust-cache@v2
+    - uses: actions/checkout@v2
+    - uses: Swatinem/rust-cache@v1
+    - name: Test compilation
+      run: make check
     - name: Run tests
-      run: cargo test --workspace --all-features --all-targets
+      run: make unit-tests
+    - name: fmt
+      run: cargo fmt --all -- --check
+    - name: clippy
+      run: cargo clippy -- -D warnings
+    - name: Check crate package size (feat. 'cargo diet')
+      continue-on-error: true
+      run: |
+        curl -LSfs https://raw.githubusercontent.com/the-lean-crate/cargo-diet/master/ci/install.sh | \
+         sh -s -- --git the-lean-crate/cargo-diet --target x86_64-unknown-linux-musl --tag v1.2.4
 
-  # some examples doesn't support our MSRV so we only test commit_counts itself on our MSRV
-  test-nightly:
-    needs: check
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Get rust-toolchain version
-      id: rust-toolchain
-      run: echo "version=$(cat macros/rust-toolchain)" >> $GITHUB_OUTPUT
-    - uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ steps.rust-toolchain.outputs.version }}
-    - uses: Swatinem/rust-cache@v2
-    - name: Run nightly tests
-      working-directory: macros
-      run: cargo test
+        cargo diet -n --package-size-limit 90KB
 
-  test-docs:
-    needs: check
-    runs-on: ubuntu-latest
+  build-and-test-on-windows:
+    name: Windows (nightly)
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
-    - name: Run doc tests
-      run: cargo test --all-features --doc
-
-  deny-check:
-    name: cargo-deny check
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.checks == 'advisories' }}
-    strategy:
-      matrix:
-        checks:
-          - advisories
-          - bans licenses sources
-    steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v1
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
         with:
-          command: check ${{ matrix.checks }}
-          manifest-path: ./Cargo.toml
-
-  armv5te-unknown-linux-musleabi:
-    needs: check
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        target: armv5te-unknown-linux-musleabi
-    - uses: Swatinem/rust-cache@v2
-    - name: Check
-      env:
-        # Clang has native cross-compilation support
-        CC: clang
-      run: >
-        cargo
-        check
-        --all-targets
-        --all-features
-        --target armv5te-unknown-linux-musleabi
-
-  wasm32-unknown-unknown:
-    needs: check
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        target: wasm32-unknown-unknown
-    - uses: Swatinem/rust-cache@v2
-    - name: Check
-      run: >
-        cargo
-        check
-        --manifest-path ./examples/simple-router-wasm/Cargo.toml
-        --target wasm32-unknown-unknown
-
-  dependencies-are-sorted:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@beta
-    - uses: Swatinem/rust-cache@v2
-    - name: Install cargo-sort
-      run: |
-        cargo install cargo-sort
-    # Work around cargo-sort not honoring workspace.exclude
-    - name: Remove non-crate folder
-      run: rm -rf examples/async-graphql
-    - name: Check dependency tables
-      run: |
-        cargo sort --workspace --grouped --check
-
-  typos:
-    name: Spell Check with Typos
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' || !github.event.pull_request.draft
-
-    steps:
-      - name: Checkout Actions Repository
-        uses: actions/checkout@v4
-
-      - name: Check the spelling of the files in our repo
-        uses: crate-ci/typos@v1.20.8
+          profile: default
+          toolchain: nightly
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - name: "Check (crossterm)"
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all --bins --tests --examples
+      - name: "Test (crossterm)"
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
