@@ -116,7 +116,7 @@ fn get_first_and_last(author: String) -> (String, String) {
     let first = parts.next().unwrap_or_default().trim();
     let last = parts.last().unwrap_or_default().trim();
 
-    // if the first name contains a comman, it's likely in the format "Last, First"
+    // if the first name contains a comma, it's likely in the format "Last, First"
     if first.contains(',') {
         let mut parts = first.split(',');
         let last = parts.next().unwrap_or_default().trim();
