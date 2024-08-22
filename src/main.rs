@@ -88,17 +88,16 @@ fn count_commits_by_user(repo: &Repository) -> Result<HashMap<String, i32>, git2
 
     let mut commits_by_user = HashMap::new();
 
-    revwalk.filter_map(|commit| {
+    revwalk.map(|commit| {
         if let Ok(commit) = commit {
             if let Ok(commit) = repo.find_commit(commit) {
                 let (first, last) = get_first_and_last(commit.author().name().unwrap_or("Unknown").to_string());
-                //concatenate first and last
+                // Concatenate first and last name
                 let name = format!("{} {}", first, last);
                 let count = commits_by_user.entry(name).or_insert(0);
                 *count += 1;
             }
         }
-        Some(()) // Provide a unit type to satisfy the type inference
     }).for_each(drop);
 
     Ok(commits_by_user)
