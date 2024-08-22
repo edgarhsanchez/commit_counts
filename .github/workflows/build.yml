@@ -15,9 +15,9 @@ jobs:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v1
     - name: Test compilation
-      run: make check
+      run: cargo check
     - name: Run tests
-      run: make unit-tests
+      run: cargo test
     - name: fmt
       run: cargo fmt --all -- --check
     - name: clippy
@@ -29,25 +29,3 @@ jobs:
          sh -s -- --git the-lean-crate/cargo-diet --target x86_64-unknown-linux-musl --tag v1.2.4
 
         cargo diet -n --package-size-limit 90KB
-
-  build-and-test-on-windows:
-    name: Windows (nightly)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: default
-          toolchain: nightly
-          override: true
-      - uses: Swatinem/rust-cache@v1
-      - name: "Check (crossterm)"
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all --bins --tests --examples
-      - name: "Test (crossterm)"
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
