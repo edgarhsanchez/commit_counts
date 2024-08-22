@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     tags:
-      - v[0-9]+.*  # Trigger the action when a tag is pushed that matches this pattern
+      - v[0-9]+.*
 
 jobs:
   build-and-release:
@@ -20,14 +20,27 @@ jobs:
           - x86_64-pc-windows-msvc
 
     steps:
-      # Checkout the code from the repository
       - uses: actions/checkout@v4
 
-      # Set up the repository name as an environment variable
       - name: Set repository name
         run: echo "REPO_NAME=$(basename ${{ github.repository }})" >> $GITHUB_ENV
 
-      # Install Rust toolchain using rustup
+      # Install dependencies on Linux
+      - name: Install dependencies on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      # Install dependencies on macOS
+      - name: Install dependencies on macOS
+        if: runner.os == 'macOS'
+        run: brew install openssl
+
+      # Install dependencies on Windows
+      - name: Install dependencies on Windows
+        if: runner.os == 'Windows'
+        run: vcpkg install openssl:x64-windows
+
+      # Set up Rust toolchain using rustup
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -37,9 +50,11 @@ jobs:
 
       # Build the Rust project in release mode
       - name: Build the binary
+        env:
+          # Set OPENSSL_DIR on macOS to point to the correct location
+          OPENSSL_DIR: ${{ runner.os == 'macOS' && '/usr/local/opt/openssl' || '' }}
         run: cargo build --release --target ${{ matrix.target }}
 
-      # Archive the binary as an artifact based on OS
       - name: Archive binary on Linux/Mac
         if: runner.os != 'Windows'
         run: |
@@ -52,7 +67,6 @@ jobs:
           mkdir -p artifacts
           cp target/${{ matrix.target }}/release/${{ env.REPO_NAME }}.exe artifacts/${{ env.REPO_NAME }}-${{ matrix.os }}.exe
 
-      # Upload the artifact for use in later jobs
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -65,7 +79,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Download the artifacts from the previous build
       - name: Download Artifacts
         uses: actions/download-artifact@v3
         with:
@@ -74,7 +87,6 @@ jobs:
             ${{ env.REPO_NAME }}-macos-latest
             ${{ env.REPO_NAME }}-windows-latest.exe
 
-      # Read the contents of CHANGELOG.md
       - name: Read CHANGELOG.md
         id: changelog
         run: |
@@ -83,7 +95,6 @@ jobs:
           echo "$CHANGELOG_CONTENT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      # Create GitHub Release with the CHANGELOG content as the release notes
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
