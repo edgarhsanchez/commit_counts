@@ -31,4 +31,4 @@ allow = [
 ]
 
 [package.metadata.cargo-public-api-crates]
-allowed = ["commit_counts"]
+allowed = ["git2", "rayon"]
