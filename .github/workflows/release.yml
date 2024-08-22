@@ -38,7 +38,22 @@ jobs:
       # Install dependencies on Windows
       - name: Install dependencies on Windows
         if: runner.os == 'Windows'
-        run: vcpkg install openssl:x64-windows
+        run: |
+          vcpkg install openssl:x64-windows
+          echo "VCPKG_ROOT=$(vcpkg_root)" >> $GITHUB_ENV
+
+      # Set environment variables for OpenSSL
+      - name: Set OpenSSL environment variables
+        if: runner.os == 'macOS'
+        run: |
+          echo "OPENSSL_DIR=$(brew --prefix openssl)" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig" >> $GITHUB_ENV
+
+      - name: Set OpenSSL environment variables for Windows
+        if: runner.os == 'Windows'
+        run: |
+          echo "OPENSSL_DIR=${{ env.VCPKG_ROOT }}/installed/x64-windows" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
 
       # Set up Rust toolchain using rustup
       - name: Set up Rust
@@ -51,8 +66,9 @@ jobs:
       # Build the Rust project in release mode
       - name: Build the binary
         env:
-          # Set OPENSSL_DIR on macOS to point to the correct location
-          OPENSSL_DIR: ${{ runner.os == 'macOS' && '/usr/local/opt/openssl' || '' }}
+          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
+          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
+          OPENSSL_STATIC: ${{ env.OPENSSL_STATIC }}
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Archive binary on Linux/Mac
