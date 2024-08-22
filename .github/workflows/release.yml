@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]  # Define the OS matrix
+        os: [ubuntu-latest]  # Define the OS matrix
         target:  # Define the target triple for each OS
           - x86_64-unknown-linux-gnu
           - x86_64-apple-darwin
