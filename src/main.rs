@@ -104,9 +104,9 @@ fn count_commits_by_user(repo: &Repository) -> Result<HashMap<String, i32>, Erro
         let commit_id = commit_id?;
         let commit = repo.find_commit(commit_id)?.clone();
         let author = commit.author();
-        if let Some(name) = author.name() {
+        if let Some(_name) = author.name() {
             let email = author.email().unwrap_or("Unknown Email");
-            let count = commits_by_user.entry(format!("{}", email)).or_insert(0);
+            let count = commits_by_user.entry(email.to_string()).or_insert(0);
             *count += 1;
         }
     }
