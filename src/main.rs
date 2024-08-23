@@ -4,7 +4,7 @@
 //! Use it like this:
 //! ./commit_counter /path/to/directory
 
-use git2::{Repository, Error};
+use git2::{Error, Repository};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::env;
