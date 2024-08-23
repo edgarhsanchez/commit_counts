@@ -4,42 +4,41 @@
 //! Use it like this:
 //! ./commit_counter /path/to/directory
 
-use git2::Repository;
+use git2::{Repository, Error};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-fn main() {
-    // Check for a command-line argument, otherwise default to current directory
+fn main() -> Result<(), Error> {
+    // Check for a command-line argument, otherwise default to the current directory
     let args: Vec<String> = env::args().collect();
     let start_path = if args.len() > 1 { &args[1] } else { "." };
 
     let git_dirs = find_git_dirs(start_path);
 
-    // Mutex to accumulate commit counts and project origins safely across threads
-    let total_commits_by_user = Mutex::new(HashMap::new());
-    let project_origins = Mutex::new(Vec::new());
+    // Arc and Mutex to safely accumulate commit counts and project origins across threads
+    let total_commits_by_user = Arc::new(Mutex::new(HashMap::new()));
+    let project_origins = Arc::new(Mutex::new(Vec::new()));
 
-    // Process each Git directory in parallel
-    git_dirs.par_iter().for_each(|git_dir| {
-        if let Ok(repo) = Repository::open(git_dir) {
-            match count_commits_by_user(&repo) {
-                Ok(commit_counts) => {
-                    let mut total_commits = total_commits_by_user.lock().unwrap();
-                    for (user, count) in commit_counts {
-                        *total_commits.entry(user).or_insert(0) += count;
-                    }
+    // Process each Git repository in parallel using Rayon
+    git_dirs.par_iter().for_each(|repo_path| {
+        let repo_path = repo_path.clone();
+        let total_commits_by_user = Arc::clone(&total_commits_by_user);
+        let project_origins = Arc::clone(&project_origins);
 
-                    if let Some(origin_url) = get_remote_origin_url(&repo) {
-                        let mut origins = project_origins.lock().unwrap();
-                        origins.push(origin_url);
-                    }
-                }
-                Err(err) => {
-                    eprintln!("Failed to count commits in repository {}: {}", git_dir, err);
+        if let Ok(repo) = Repository::open(repo_path) {
+            if let Ok(origin_url) = get_remote_origin_url(&repo) {
+                let mut origins = project_origins.lock().unwrap();
+                origins.push(origin_url);
+            }
+
+            if let Ok(commit_counts) = count_commits_by_user(&repo) {
+                let mut total_commits = total_commits_by_user.lock().unwrap();
+                for (user, count) in commit_counts {
+                    *total_commits.entry(user).or_insert(0) += count;
                 }
             }
         }
@@ -62,6 +61,8 @@ fn main() {
     for origin in project_origins.iter() {
         println!("{}", origin);
     }
+
+    Ok(())
 }
 
 fn find_git_dirs(start_path: &str) -> Vec<String> {
@@ -84,58 +85,31 @@ fn find_git_dirs(start_path: &str) -> Vec<String> {
     git_dirs
 }
 
-fn count_commits_by_user(repo: &Repository) -> Result<HashMap<String, i32>, git2::Error> {
+fn get_remote_origin_url(repo: &Repository) -> Result<String, Error> {
+    if let Ok(remote) = repo.find_remote("origin") {
+        if let Some(url) = remote.url() {
+            return Ok(url.to_string());
+        }
+    }
+    Err(Error::from_str("No remote origin found"))
+}
+
+fn count_commits_by_user(repo: &Repository) -> Result<HashMap<String, i32>, Error> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
 
     let mut commits_by_user = HashMap::new();
 
-    revwalk
-        .map(|commit| {
-            if let Ok(commit) = commit {
-                if let Ok(commit) = repo.find_commit(commit) {
-                    let (first, last) =
-                        get_first_and_last(commit.author().name().unwrap_or("Unknown").to_string());
-                    // Concatenate first and last name
-                    let name = format!("{} {}", first, last);
-                    let count = commits_by_user.entry(name).or_insert(0);
-                    *count += 1;
-                }
-            }
-        })
-        .for_each(drop);
-
-    Ok(commits_by_user)
-}
-
-// get the first and last name of the author
-fn get_first_and_last(author: String) -> (String, String) {
-    // if email return email
-    if author.contains('@') {
-        return (author, "".to_string());
-    }
-
-    let binding = author.to_ascii_lowercase();
-    let mut parts = binding.split_whitespace();
-    let first = parts.next().unwrap_or_default().trim();
-    let last = parts.last().unwrap_or_default().trim();
-
-    // if the first name contains a comma, it's likely in the format "Last, First"
-    if first.contains(',') {
-        let mut parts = first.split(',');
-        let last = parts.next().unwrap_or_default().trim();
-        let first = parts.next().unwrap_or_default().trim();
-        return (first.to_string(), last.to_string());
-    }
-
-    (first.to_string(), last.to_string())
-}
-
-fn get_remote_origin_url(repo: &Repository) -> Option<String> {
-    if let Ok(remote) = repo.find_remote("origin") {
-        if let Some(url) = remote.url() {
-            return Some(url.to_string());
+    for commit_id in revwalk {
+        let commit_id = commit_id?;
+        let commit = repo.find_commit(commit_id)?.clone();
+        let author = commit.author();
+        if let Some(name) = author.name() {
+            let email = author.email().unwrap_or("Unknown Email");
+            let count = commits_by_user.entry(format!("{}", email)).or_insert(0);
+            *count += 1;
         }
     }
-    None
+
+    Ok(commits_by_user)
 }
